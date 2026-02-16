@@ -1,112 +1,474 @@
-import { useState, useEffect } from "react";
-import { Pie } from "react-chartjs-2";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-
-ChartJS.register(ArcElement, Tooltip, Legend);
+import React, { useState, useEffect } from "react";
 
 function App() {
 
-  const [user, setUser] = useState("");
-  const [amount, setAmount] = useState("");
-  const [merchant, setMerchant] = useState("");
+const [username,setUsername]=useState("")
+const [amount,setAmount]=useState("")
+const [merchant,setMerchant]=useState("")
 
-  const [result, setResult] = useState("");
-  const [risk, setRisk] = useState("");
-  const [reasons, setReasons] = useState([]);
-  const [stats, setStats] = useState({ allowed: 0, blocked: 0, otp: 0 });
+const [decision,setDecision]=useState("")
+const [risk,setRisk]=useState(0)
 
-  const [showOtp, setShowOtp] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [serverOtp, setServerOtp] = useState("");
+const [otp,setOtp]=useState("")
+const [otpRequired,setOtpRequired]=useState(false)
 
-  async function sendMoney() {
-    const res = await fetch("http://127.0.0.1:8000/check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user, amount, merchant })
-    });
+const [transactions,setTransactions]=useState([])
+const [analytics,setAnalytics]=useState({})
 
-    const data = await res.json();
 
-    setResult(data.decision);
-    setRisk(data.risk);
-    setReasons(data.reasons || []);
+useEffect(()=>{
 
-    if (data.decision === "OTP_REQUIRED") {
-      setShowOtp(true);
-      setServerOtp(data.otp);
-      updateStats("otp");
-    } else if (data.decision === "BLOCK" || data.decision === "BANNED") {
-      updateStats("blocked");
-    } else if (data.decision === "ALLOW") {
-      updateStats("allowed");
-    }
-  }
+loadTransactions()
+loadAnalytics()
 
-  function updateStats(type) {
-    setStats(prev => ({
-      ...prev,
-      [type]: prev[type] + 1
-    }));
-  }
+},[])
 
-  async function verifyOtp() {
-    const res = await fetch("http://127.0.0.1:8000/verify-otp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user, otp })
-    });
 
-    const data = await res.json();
-    alert(data.message);
-    setShowOtp(false);
-  }
 
-  const chartData = {
-    labels: ["Allowed", "Blocked", "OTP Required"],
-    datasets: [
-      {
-        data: [stats.allowed, stats.blocked, stats.otp],
-        backgroundColor: ["#4CAF50", "#F44336", "#FFC107"]
-      }
-    ]
-  };
+const loadTransactions=async()=>{
 
-  return (
-    <div style={{ padding: "40px", fontFamily: "Arial" }}>
-      <h1>PayShield AI Fraud Dashboard</h1>
+const res=await fetch("https://payshield-backend.onrender.com/transactions")
+const data=await res.json()
+setTransactions(data)
 
-      <div style={{ marginBottom: "20px" }}>
-        <input placeholder="User" value={user} onChange={e => setUser(e.target.value)} />
-        <input placeholder="Amount" value={amount} onChange={e => setAmount(e.target.value)} />
-        <input placeholder="Merchant" value={merchant} onChange={e => setMerchant(e.target.value)} />
-        <button onClick={sendMoney}>Send</button>
-      </div>
-
-      <h2>{result}</h2>
-      <p>Risk: {risk}%</p>
-
-      <ul>
-        {reasons.map((r, i) => <li key={i}>{r}</li>)}
-      </ul>
-
-      {showOtp && (
-        <div>
-          <h3>Enter OTP</h3>
-          <p>(Demo OTP: {serverOtp})</p>
-          <input value={otp} onChange={e => setOtp(e.target.value)} />
-          <button onClick={verifyOtp}>Verify</button>
-        </div>
-      )}
-
-      <hr />
-
-      <h2>Fraud Analytics</h2>
-      <div style={{ width: "300px" }}>
-        <Pie data={chartData} />
-      </div>
-    </div>
-  );
 }
 
-export default App;
+
+
+const loadAnalytics=async()=>{
+
+const res=await fetch("https://payshield-backend.onrender.com/analytics")
+const data=await res.json()
+setAnalytics(data)
+
+}
+
+
+
+
+const analyze=async()=>{
+
+if(amount>20000){
+
+const res=await fetch("https://payshield-backend.onrender.com/send-otp",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({username,amount,merchant})
+
+})
+
+const data=await res.json()
+
+alert("Demo OTP: "+data.otp)
+
+setOtpRequired(true)
+
+return
+
+}
+
+processTransaction()
+
+}
+
+
+
+const verifyOtp=async()=>{
+
+const res=await fetch("https://payshield-backend.onrender.com/verify-otp",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({username,otp:Number(otp)})
+
+})
+
+const data=await res.json()
+
+if(data.status==="VERIFIED"){
+
+setOtpRequired(false)
+processTransaction()
+
+}
+else{
+
+alert("Wrong OTP")
+
+}
+
+}
+
+
+
+const processTransaction=async()=>{
+
+const res=await fetch("https://payshield-backend.onrender.com/check",{
+
+method:"POST",
+
+headers:{"Content-Type":"application/json"},
+
+body:JSON.stringify({
+
+username,
+amount:Number(amount),
+merchant
+
+})
+
+})
+
+const data=await res.json()
+
+setDecision(data.decision)
+setRisk(data.risk_score)
+
+loadTransactions()
+loadAnalytics()
+
+}
+
+
+
+return(
+
+<div style={styles.page}>
+
+
+<h1 style={styles.title}>
+🛡 PayShield Fraud Detection
+</h1>
+
+
+
+<div style={styles.card}>
+
+
+<input style={styles.input}
+placeholder="Username"
+onChange={e=>setUsername(e.target.value)}
+/>
+
+
+<input style={styles.input}
+placeholder="Amount"
+onChange={e=>setAmount(e.target.value)}
+/>
+
+
+<input style={styles.input}
+placeholder="Merchant"
+onChange={e=>setMerchant(e.target.value)}
+/>
+
+
+
+<button style={styles.button}
+onClick={analyze}>
+Analyze Transaction
+</button>
+
+
+
+{otpRequired && (
+
+<div style={{marginTop:15}}>
+
+<input style={styles.input}
+placeholder="Enter OTP"
+onChange={e=>setOtp(e.target.value)}
+/>
+
+
+<button style={styles.button}
+onClick={verifyOtp}>
+Verify OTP
+</button>
+
+
+</div>
+
+)}
+
+
+
+</div>
+
+
+
+<div style={{marginTop:20}}>
+
+<h2>Decision:
+<span style={decisionColor(decision)}>
+{decision}
+</span>
+</h2>
+
+
+<h3>Risk Score: {risk}%</h3>
+
+
+<div style={styles.riskBarBg}>
+
+<div style={{
+
+...styles.riskBarFill,
+
+width:risk+"%"
+
+}}/>
+
+</div>
+
+
+</div>
+
+
+
+
+<div style={styles.analyticsRow}>
+
+
+<Card title="Total"
+value={analytics.total}
+color="#4f46e5"/>
+
+
+<Card title="Fraud"
+value={analytics.fraud}
+color="#dc2626"/>
+
+
+<Card title="Safe"
+value={analytics.safe}
+color="#16a34a"/>
+
+
+<Card title="Fraud %"
+value={analytics.fraud_percent?.toFixed(2)+"%"}
+color="#ea580c"/>
+
+
+</div>
+
+
+
+<h2 style={{marginTop:30}}>
+Transaction History
+</h2>
+
+
+
+<table style={styles.table}>
+
+<tr>
+
+<th>ID</th>
+<th>User</th>
+<th>Amount</th>
+<th>Merchant</th>
+<th>Risk</th>
+<th>Decision</th>
+<th>Time</th>
+
+</tr>
+
+
+{transactions.map(t=>(
+
+<tr key={t.id}>
+
+<td>{t.id}</td>
+<td>{t.username}</td>
+<td>{t.amount}</td>
+<td>{t.merchant}</td>
+<td>{t.risk_score}%</td>
+<td>{t.decision}</td>
+<td>{t.timestamp}</td>
+
+</tr>
+
+))}
+
+</table>
+
+
+
+</div>
+
+)
+
+}
+
+
+
+function Card({title,value,color}){
+
+return(
+
+<div style={{
+...styles.analyticsCard,
+background:color
+}}>
+
+<h3>{title}</h3>
+
+<h2>{value}</h2>
+
+</div>
+
+)
+
+}
+
+
+
+const decisionColor=(decision)=>{
+
+if(decision==="SAFE") return {color:"#22c55e",marginLeft:10}
+if(decision==="FLAGGED") return {color:"#f59e0b",marginLeft:10}
+if(decision==="BANNED") return {color:"#ef4444",marginLeft:10}
+
+}
+
+
+
+const styles={
+
+page:{
+
+background:"#020617",
+minHeight:"100vh",
+padding:"40px",
+color:"white",
+fontFamily:"Segoe UI"
+
+},
+
+
+title:{
+
+color:"#22c55e"
+
+},
+
+
+card:{
+
+background:"rgba(255,255,255,0.05)",
+
+padding:"30px",
+
+width:"320px",
+
+borderRadius:"12px",
+
+backdropFilter:"blur(10px)"
+
+},
+
+
+input:{
+
+display:"block",
+marginTop:"15px",
+padding:"12px",
+width:"100%",
+borderRadius:"8px",
+border:"none",
+color:"#000000",
+caretColor:"#000000"
+
+},
+
+
+button:{
+
+marginTop:"15px",
+
+padding:"12px",
+
+width:"100%",
+
+background:"#22c55e",
+
+border:"none",
+
+borderRadius:"8px",
+
+color:"white",
+
+fontWeight:"bold",
+
+cursor:"pointer"
+
+},
+
+
+riskBarBg:{
+
+height:"12px",
+
+background:"#1e293b",
+
+borderRadius:"10px",
+
+marginTop:"10px"
+
+},
+
+
+riskBarFill:{
+
+height:"100%",
+
+background:"#ef4444",
+
+borderRadius:"10px"
+
+},
+
+
+analyticsRow:{
+
+display:"flex",
+
+gap:"20px",
+
+marginTop:"30px"
+
+},
+
+
+analyticsCard:{
+
+padding:"20px",
+
+borderRadius:"10px",
+
+width:"140px"
+
+},
+
+
+table:{
+
+marginTop:"20px",
+
+width:"100%",
+
+borderCollapse:"collapse"
+
+}
+
+}
+
+
+
+export default App
