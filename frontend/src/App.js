@@ -25,6 +25,7 @@ loadAnalytics()
 
 
 
+// ✅ CHANGED URL
 const loadTransactions=async()=>{
 
 const res=await fetch("https://payshield-backend.onrender.com/transactions")
@@ -35,6 +36,7 @@ setTransactions(data)
 
 
 
+// ✅ CHANGED URL
 const loadAnalytics=async()=>{
 
 const res=await fetch("https://payshield-backend.onrender.com/analytics")
@@ -45,7 +47,7 @@ setAnalytics(data)
 
 
 
-
+// ✅ CHANGED URL
 const analyze=async()=>{
 
 if(amount>20000){
@@ -76,6 +78,7 @@ processTransaction()
 
 
 
+// ✅ CHANGED URL
 const verifyOtp=async()=>{
 
 const res=await fetch("https://payshield-backend.onrender.com/verify-otp",{
@@ -106,6 +109,7 @@ alert("Wrong OTP")
 
 
 
+// ✅ CHANGED URL
 const processTransaction=async()=>{
 
 const res=await fetch("https://payshield-backend.onrender.com/check",{
@@ -391,21 +395,13 @@ caretColor:"#000000"
 button:{
 
 marginTop:"15px",
-
 padding:"12px",
-
 width:"100%",
-
 background:"#22c55e",
-
 border:"none",
-
 borderRadius:"8px",
-
 color:"white",
-
 fontWeight:"bold",
-
 cursor:"pointer"
 
 },
@@ -414,11 +410,8 @@ cursor:"pointer"
 riskBarBg:{
 
 height:"12px",
-
 background:"#1e293b",
-
 borderRadius:"10px",
-
 marginTop:"10px"
 
 },
@@ -427,9 +420,7 @@ marginTop:"10px"
 riskBarFill:{
 
 height:"100%",
-
 background:"#ef4444",
-
 borderRadius:"10px"
 
 },
@@ -438,9 +429,7 @@ borderRadius:"10px"
 analyticsRow:{
 
 display:"flex",
-
 gap:"20px",
-
 marginTop:"30px"
 
 },
@@ -449,9 +438,7 @@ marginTop:"30px"
 analyticsCard:{
 
 padding:"20px",
-
 borderRadius:"10px",
-
 width:"140px"
 
 },
@@ -460,9 +447,7 @@ width:"140px"
 table:{
 
 marginTop:"20px",
-
 width:"100%",
-
 borderCollapse:"collapse"
 
 }
