@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 
 function App() {
 
+const API="https://payshield-backend.onrender.com";
+
 const [username,setUsername]=useState("")
 const [amount,setAmount]=useState("")
 const [merchant,setMerchant]=useState("")
@@ -25,10 +27,9 @@ loadAnalytics()
 
 
 
-// ✅ CHANGED URL
 const loadTransactions=async()=>{
 
-const res=await fetch("https://payshield-backend.onrender.com/transactions")
+const res=await fetch(API+"/transactions")
 const data=await res.json()
 setTransactions(data)
 
@@ -36,10 +37,9 @@ setTransactions(data)
 
 
 
-// ✅ CHANGED URL
 const loadAnalytics=async()=>{
 
-const res=await fetch("https://payshield-backend.onrender.com/analytics")
+const res=await fetch(API+"/analytics")
 const data=await res.json()
 setAnalytics(data)
 
@@ -47,12 +47,12 @@ setAnalytics(data)
 
 
 
-// ✅ CHANGED URL
+
 const analyze=async()=>{
 
 if(amount>20000){
 
-const res=await fetch("https://payshield-backend.onrender.com/send-otp",{
+const res=await fetch(API+"/send-otp",{
 
 method:"POST",
 
@@ -78,10 +78,9 @@ processTransaction()
 
 
 
-// ✅ CHANGED URL
 const verifyOtp=async()=>{
 
-const res=await fetch("https://payshield-backend.onrender.com/verify-otp",{
+const res=await fetch(API+"/verify-otp",{
 
 method:"POST",
 
@@ -109,10 +108,9 @@ alert("Wrong OTP")
 
 
 
-// ✅ CHANGED URL
 const processTransaction=async()=>{
 
-const res=await fetch("https://payshield-backend.onrender.com/check",{
+const res=await fetch(API+"/check",{
 
 method:"POST",
 
@@ -255,7 +253,7 @@ color="#16a34a"/>
 
 
 <Card title="Fraud %"
-value={analytics.fraud_percent?.toFixed(2)+"%"}
+value={analytics.fraud_percent ? analytics.fraud_percent.toFixed(2)+"%" : "0%"}
 color="#ea580c"/>
 
 
@@ -386,6 +384,7 @@ padding:"12px",
 width:"100%",
 borderRadius:"8px",
 border:"none",
+
 color:"#000000",
 caretColor:"#000000"
 
@@ -395,13 +394,21 @@ caretColor:"#000000"
 button:{
 
 marginTop:"15px",
+
 padding:"12px",
+
 width:"100%",
+
 background:"#22c55e",
+
 border:"none",
+
 borderRadius:"8px",
+
 color:"white",
+
 fontWeight:"bold",
+
 cursor:"pointer"
 
 },
@@ -410,8 +417,11 @@ cursor:"pointer"
 riskBarBg:{
 
 height:"12px",
+
 background:"#1e293b",
+
 borderRadius:"10px",
+
 marginTop:"10px"
 
 },
@@ -420,7 +430,9 @@ marginTop:"10px"
 riskBarFill:{
 
 height:"100%",
+
 background:"#ef4444",
+
 borderRadius:"10px"
 
 },
@@ -429,7 +441,9 @@ borderRadius:"10px"
 analyticsRow:{
 
 display:"flex",
+
 gap:"20px",
+
 marginTop:"30px"
 
 },
@@ -438,7 +452,9 @@ marginTop:"30px"
 analyticsCard:{
 
 padding:"20px",
+
 borderRadius:"10px",
+
 width:"140px"
 
 },
@@ -447,7 +463,9 @@ width:"140px"
 table:{
 
 marginTop:"20px",
+
 width:"100%",
+
 borderCollapse:"collapse"
 
 }
