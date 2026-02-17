@@ -1,9 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+from datetime import datetime
 import random
-import joblib
-import os
+
+# ---------------- APP ----------------
 
 app = FastAPI()
 
@@ -15,110 +18,154 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load ML model
-model_path = os.path.join(os.path.dirname(__file__), "..", "ml", "model.pkl")
-model = joblib.load(model_path)
+# ---------------- DATABASE ----------------
 
-users = {
-    "riya": {"risk": 10, "blocks": 0, "banned": False},
-    "ashish": {"risk": 5, "blocks": 0, "banned": False},
-    "scammer": {"risk": 80, "blocks": 2, "banned": False}
-}
+DATABASE_URL = "sqlite:///./payshield.db"
 
-transactions = []
-pending_otps = {}
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
-class Transaction(BaseModel):
-    user: str
+SessionLocal = sessionmaker(bind=engine)
+
+Base = declarative_base()
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String)
+    amount = Column(Float)
+    merchant = Column(String)
+    risk_score = Column(Float)
+    decision = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# ---------------- OTP STORE ----------------
+
+otp_store = {}
+
+# ---------------- REQUEST MODEL ----------------
+
+class TransactionRequest(BaseModel):
+    username: str
     amount: float
     merchant: str
 
-class OTPVerify(BaseModel):
-    user: str
-    otp: str
+
+class OTPRequest(BaseModel):
+    username: str
+    otp: int
+
+
+# ---------------- OTP SEND ----------------
+
+@app.post("/send-otp")
+def send_otp(data: TransactionRequest):
+
+    otp = random.randint(100000,999999)
+
+    otp_store[data.username] = otp
+
+    return {
+        "status":"OTP_REQUIRED",
+        "otp": otp
+    }
+
+
+# ---------------- OTP VERIFY ----------------
+
+@app.post("/verify-otp")
+def verify_otp(data: OTPRequest):
+
+    real = otp_store.get(data.username)
+
+    if real == data.otp:
+        return {"status":"VERIFIED"}
+
+    return {"status":"FAILED"}
+
+
+# ---------------- CHECK ----------------
 
 @app.post("/check")
-def check(txn: Transaction):
+def check_transaction(data: TransactionRequest, db: Session = Depends(get_db)):
 
-    user = txn.user.lower()
+    risk = 0
 
-    if user not in users:
-        users[user] = {"risk": 20, "blocks": 0, "banned": False}
+    if data.amount > 20000:
+        risk += 40
 
-    if users[user]["banned"]:
-        return {
-            "decision": "BANNED",
-            "risk": 100,
-            "reasons": ["User permanently banned due to fraud"]
-        }
+    if data.amount > 100000:
+        risk += 100
 
-    base_risk = users[user]["risk"]
+    if data.username.lower() == "scammer":
+        risk += 100
 
-    unknown_merchant = 0 if "shop" in txn.merchant.lower() else 1
-    blocked_before = 1 if users[user]["blocks"] > 0 else 0
 
-    # ML prediction
-    prediction = model.predict([[txn.amount, unknown_merchant, blocked_before]])[0]
-
-    risk = base_risk + (30 if prediction == 1 else 0)
-    reasons = []
-
-    if prediction == 1:
-        reasons.append("ML detected fraud pattern")
-
-    if txn.amount > 5000:
-        risk += 20
-        reasons.append("High amount")
-
-    # Decision
-    if risk > 90:
-        decision = "BLOCK"
-        users[user]["blocks"] += 1
-        users[user]["risk"] += 10
-
-        if users[user]["blocks"] >= 3:
-            users[user]["banned"] = True
-            decision = "BANNED"
-
-    elif risk > 40:
-        decision = "OTP_REQUIRED"
-        otp = str(random.randint(1000, 9999))
-        pending_otps[user] = otp
-        return {
-            "decision": "OTP_REQUIRED",
-            "otp": otp,
-            "risk": risk,
-            "reasons": reasons
-        }
-
+    if risk >= 100:
+        decision = "BANNED"
+    elif risk >= 40:
+        decision = "FLAGGED"
     else:
-        decision = "ALLOW"
+        decision = "SAFE"
 
-    transactions.append({
-        "user": user,
-        "amount": txn.amount,
-        "merchant": txn.merchant,
-        "risk": risk,
-        "decision": decision
-    })
+
+    txn = Transaction(
+        username=data.username,
+        amount=data.amount,
+        merchant=data.merchant,
+        risk_score=risk,
+        decision=decision,
+        timestamp=datetime.utcnow()
+    )
+
+    db.add(txn)
+    db.commit()
 
     return {
         "decision": decision,
-        "risk": risk,
-        "reasons": reasons,
-        "ml_prediction": int(prediction)
+        "risk_score": risk
     }
 
-@app.post("/verify-otp")
-def verify(data: OTPVerify):
-    user = data.user.lower()
-    otp = data.otp
 
-    if user in pending_otps and pending_otps[user] == otp:
-        del pending_otps[user]
-        return {"status": "SUCCESS", "message": "Payment verified"}
-    else:
-        users[user]["blocks"] += 1
-        if users[user]["blocks"] >= 3:
-            users[user]["banned"] = True
-        return {"status": "FAILED", "message": "Invalid OTP"}
+# ---------------- TRANSACTIONS ----------------
+
+@app.get("/transactions")
+def get_transactions(db: Session = Depends(get_db)):
+
+    return db.query(Transaction).order_by(Transaction.id.desc()).all()
+
+
+# ---------------- ANALYTICS ----------------
+
+@app.get("/analytics")
+def analytics(db: Session = Depends(get_db)):
+
+    txns = db.query(Transaction).all()
+
+    total = len(txns)
+
+    fraud = len([t for t in txns if t.decision in ["FLAGGED","BANNED"]])
+
+    safe = total - fraud
+
+    percent = (fraud/total*100) if total else 0
+
+    return {
+        "total": total,
+        "fraud": fraud,
+        "safe": safe,
+        "fraud_percent": percent
+    }
